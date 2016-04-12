@@ -1,5 +1,3 @@
-#include "codec.h"
-
 //
 //  main.cpp
 //  hzip
@@ -8,8 +6,6 @@
 //  Copyright © 2016 Alexey Kharlamov. All rights reserved.
 //
 
-#include "stdafx.h"
-#include <algorithm>
 #include <iostream>
 #include <string>
 #include <map>
@@ -19,6 +15,11 @@
 #include <cstdlib>
 #include <stdio.h>
 #include <ctime>
+#include <algorithm>
+#if 0
+  #include <experimental/string_view>
+#endif
+
 
 
 
@@ -52,187 +53,200 @@ std::string dec_to_bin(int dec) {
     int mod;
     long double_ = 0;
 
-    for (i = 0; dec > 0; i++) {
+    for (i = 0; dec>0; i++) {
 
         mod = dec % 2;
         dec = (dec - mod) / 2;
         double_ += mod * pow((double)10, i);
     }
-    return std::to_string(double_);
+
+    std::string res = std::to_string(double_);
+
+    if (res.length() < 7) {
+        std::string temp = "";
+        for(int i = res.length(); i < 7; ++i)
+        {
+            temp += "0";
+        }
+        res = temp + res;
+    }
+    return res;
 
 }
 
 
-unsigned char pack_byte(bool bits[8])
-{
-    unsigned char result(0);
-    for (unsigned i(8); i--;)
-    {
+char pack_byte(bool bits[7]) {
+#if 0
+  unsigned char result(0);
+    for (unsigned i(8); i--;) {
         result <<= 1;
         result |= unsigned char(bits[i]);
     }
     return result;
+#endif
+    short pow[7] = { 64, 32, 16, 8, 4, 2, 1 };
+    int res = 0;
+    for (int i = 0; i < 7; ++i) {
+        res += int(bits[i]) * pow[i];
+    }
+    return res;
+
+}
+
+void load_file(std::string& s, std::istream& is) {
+    s.erase();
+    if (is.bad()) return;
+    //
+    // attempt to grow string buffer to match file size,
+    // this doesn't always work...
+    s.reserve(is.rdbuf()->in_avail());
+    char c;
+    while (is.get(c)) {
+        // use logarithmic growth stategy, in case
+        // in_avail (above) returned zero:
+        if (s.capacity() == s.size())
+            s.reserve(s.capacity() * 3);
+        s.append(1, c);
+    }
 }
 
 void encode() {
     std::vector<std::string> dictionary(258, "");
     unsigned long start_time = clock();
 
+    std::ifstream file("test.txt");
 
-    std::ifstream file("lorem.txt");
 
-    //std::string   result;
+    if (file) {
+        // get length of file:
+        file.seekg(0, file.end);
+        unsigned long long length = file.tellg();
+        file.seekg(0, file.beg);
 
-    //std::copy(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>(), std::back_inserter(result));
-    std::vector<int> dict(256, 0);
-    std::cout << "ok";
-    int w = 0;
-    std::string buffer;
-    
-    
-    while (std::getline(file, buffer))
-    {
-        for (size_t i = 0; i < buffer.length(); i++)
-        {
+        char * buffer = new char[length];
+
+        // read data as a block:
+        file.read(buffer, length);
+
+        std::cout << "reading " << (clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
+
+        std::vector<int> dict(256, 0);
+
+        for (int i = 0; i < length; ++i) {
             dict[int(buffer[i]) + 128] += 1;
         }
-        if (w % 100000 == 0)
-        {
-            std::cout << w << std::endl;
+
+        std::priority_queue<ver, std::vector<ver>, ver> qu;
+
+        std::vector<std::pair<int, char>> chardict;
+        for (int i = 0; i < 256; ++i) {
+            if (dict[i] > 0) {
+                chardict.push_back(std::make_pair(dict[i], char(i - 128)));
+            }
         }
-        ++w;
-       
-    }
 
-    
+        std::sort(chardict.begin(), chardict.end());
 
-    file.close();
+        for (int i = 0; i < chardict.size(); ++i) { //инициализация вершин
+            ver* temp = new ver;
+            temp->myself = temp;
+            temp->counter = chardict[i].first;
+            temp->letter = chardict[i].second;
+            temp->leftson = NULL;
+            temp->rightson = NULL;
+            qu.push(*temp);
 
-
-    std::cout << "reading " << (clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
-
-
-
-    std::priority_queue<ver, std::vector<ver>, ver> qu;
-
-    std::vector<std::pair<int, char>> chardict;
-    for (int i = 0; i < 256; ++i) {
-        if (dict[i] > 0) {
-            chardict.push_back(std::make_pair(dict[i], char(i - 128)));
         }
-    }
 
-    std::sort(chardict.begin(), chardict.end());
+        unsigned long init = clock() - start_time;
+        std::cout << "init " << init / (double)CLOCKS_PER_SEC << std::endl;
 
-    for (int i = 0; i < chardict.size(); ++i) { //инициализация вершин
-        ver* temp = new ver;
-        temp->myself = temp;
-        temp->counter = chardict[i].first;
-        temp->letter = chardict[i].second;
-        temp->leftson = NULL;
-        temp->rightson = NULL;
-        qu.push(*temp);
-
-    }
-
-    unsigned long init = clock() - start_time;
-    std::cout << "init " << init / (double)CLOCKS_PER_SEC << std::endl;
-
-    while (qu.size() > 1) { //постройка дерева
-        const ver* left;
-        const ver* right;
-        left = qu.top().myself;
-        qu.pop();
-        right = qu.top().myself;
-        qu.pop();
-        ver* newver = new ver;
-        newver->myself = newver;
-        newver->leftson = left;
-        newver->rightson = right;
-        newver->counter = left->counter + right->counter;
-        newver->letter = '\0';
-        qu.push(*newver);
-    }
-
-    unsigned long tree = clock();
-    std::cout << "build tree " << (tree - init) / (double)CLOCKS_PER_SEC << std::endl;
-
-    build_dict(qu.top(), "", dictionary); //создание словаря
-
-    unsigned long dic = clock();
-    std::cout << "build dict " << (dic - tree) / (double)CLOCKS_PER_SEC << std::endl;
-
-    std::ofstream fout("dict.txt");
-    int counter = 0;
-
-    for (int i = 0; i < dictionary.size(); ++i) {
-        if (dictionary[i] != "") {
-            counter++;
+        while (qu.size() > 1) { //постройка дерева
+            const ver* left;
+            const ver* right;
+            left = qu.top().myself;
+            qu.pop();
+            right = qu.top().myself;
+            qu.pop();
+            ver* newver = new ver;
+            newver->myself = newver;
+            newver->leftson = left;
+            newver->rightson = right;
+            newver->counter = left->counter + right->counter;
+            newver->letter = '\0';
+            qu.push(*newver);
         }
-    }
 
+        unsigned long tree = clock();
+        std::cout << "build tree " << (tree - init) / (double)CLOCKS_PER_SEC << std::endl;
 
-    fout << counter << std::endl; //в 1 строке каждого словаря хранится кол-во слов в нем КОСТЫЛИ!!! ИСПРАВИТЬ!!!
+        build_dict(qu.top(), "", dictionary); //создание словаря
 
-    for (int i = 0; i < dictionary.size(); ++i) {
-        if (dictionary[i] != "") {
-            fout << char(i - 128) << " " << dictionary[i] << std::endl;
+        unsigned long dic = clock();
+        std::cout << "build dict " << (dic - tree) / (double)CLOCKS_PER_SEC << std::endl;
+
+        std::ofstream fout("dict.txt");
+        int counter = 0;
+
+        for (int i = 0; i < dictionary.size(); ++i) {
+            if (dictionary[i] != "") {
+                counter++;
+            }
         }
-    }
-
-    fout.close();
-
-    unsigned long builddict = clock();
-    std::cout << "building dictionary " << builddict / (double)CLOCKS_PER_SEC - dic / (double)CLOCKS_PER_SEC << std::endl;
-
-    std::ofstream codeout("coded");
-    std::ifstream filenew("lorem.txt");
-
-    int j = -1;
-    std::string buff = "";
-    bool bits[8];
 
 
-    while (!filenew.eof())
-    {
-        std::string buffer;
-        std::getline(filenew, buffer);
+        fout << counter << std::endl; //в 1 строке каждого словаря хранится кол-во слов в нем КОСТЫЛИ!!! ИСПРАВИТЬ!!!
 
+        for (int i = 0; i < dictionary.size(); ++i) {
+            if (dictionary[i] != "") {
+                fout << char(i - 128) << " " << dictionary[i] << std::endl;
+            }
+        }
 
-        for (unsigned long long i = 0; i < buffer.length(); ++i) {
+        fout.close();
+
+        unsigned long builddict = clock();
+        std::cout << "writing dict " << builddict / (double)CLOCKS_PER_SEC - dic / (double)CLOCKS_PER_SEC << std::endl;
+
+        std::ofstream codeout("coded");
+
+        int j = -1;
+        std::string buff = "";
+        bool bits[7];
+
+        for (unsigned long long i = 0; i < length; ++i) {
             //codeout << dictionary[int(buffer[i]) + 128];
             // попробуем без упаковки
+            //std::cout << dictionary[int(buffer[i]) + 128] << " ";
             for (auto elem : dictionary[int(buffer[i]) + 128]) {
+                
                 j += 1;
                 bits[j] = bool(elem - '0');
 
 
-                if (j == 7) {
+                if (j == 6) {
                     buff += pack_byte(bits);
                     j = -1;
-
-                }
-
-                if (buff.length() > 10) {
-                    codeout << buff;
-                    buff = "";
                 }
 
 
             }
+
+        }
+        delete[] buffer;
+
+
+        codeout << buff;
+        for (int i = 0; i < j + 1; ++i) {
+            codeout << bits[i];
+        }
+        codeout << j + 1;
+        //std::cout << buff;
+
+        codeout.close();
+        std::cout << "writing " << (clock() - builddict) / (double)CLOCKS_PER_SEC << std::endl;
+        std::cout << "coding " << (clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
     }
-
-
-    }
-    
-
-
-    codeout << buff;
-
-    codeout.close();
-    std::cout << "writng " << (clock() - builddict) / (double)CLOCKS_PER_SEC << std::endl;
-    std::cout << "all " << (clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
-
 
 
 }
@@ -240,45 +254,61 @@ void encode() {
 
 
 void decode() {
+    unsigned long start = clock();
     std::ifstream dicin("dict.txt");
-    int n;
-    dicin >> n;
-    std::cout << n << std::endl;
+    std::string n;
+    std::getline(dicin, n);
+    //std::cout << std::stoi(n) << std::endl;
     std::map<std::string, char> dict;
 
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < std::stoi(n); ++i) {
         std::string str;
         char let;
-        dicin >> let >> str;
+        //let = dicin.get();
+        std::getline(dicin, str);
+        let = str[0];
+        str.erase(0, 2);
         dict[str] = let;
+        //std::cout << let << " " << str << " " <<  str.length() <<  std::endl;
     }
+    
 
     dicin.close();
 
+    const char *fileName("coded");
+    std::ifstream file(fileName, std::ios::binary);
+    //std::ifstream file("coded", std::ios::binary);
+    std::string buffer;  
+    
+    file.seekg(0, std::ios_base::end);
+    std::ifstream::pos_type len = file.tellg();
+    file.seekg(0);
+    buffer.resize(len);
+    file.read((char*)buffer.data(), len);
+    unsigned long long length = len;
 
-    std::ifstream in("coded");
+    unsigned long dict_coded = clock();
+    std::cout << "reading dict with coded file " << (dict_coded - start) / (double)CLOCKS_PER_SEC << std::endl;
 
     std::ofstream out("output.txt");
     std::string mem = "";
+    //std::cout << buffer[length - 1] << std::endl;
 
-    while (!in.eof()) {
-        std::string tempstr;
-        char temp = in.get();
-        //std::cout << temp;
-        mem += temp;
-        //std::getline(in, tempstr);
-        //for (int i = 0; i < tempstr.length(); ++i) {
-        //std::string str = dec_to_bin(int(tempstr[i]));
-        //mem += tempstr[i];
-        //}
-
+    for (int i = 0; i < length - buffer[length - 1] + '0' - 1; ++i ) {
+        //std::cout << buffer[i] << " " << int(buffer[i]) << std::endl;
+        mem += dec_to_bin(int(buffer[i]));
+    }
+    for (int i = length - buffer[length - 1] - 1 + '0'; i < length - 1; ++i) {
+        mem += buffer[i];
     }
     //std::cout << mem << std::endl;
-    in.close();
 
+    unsigned long outbuff = clock();
+    std::cout << "outbufing " << (outbuff - dict_coded) / (double)CLOCKS_PER_SEC << std::endl;
     std::string tempstr = "";
     for (int i = 0; i < mem.length(); ++i) {
         tempstr += mem[i];
+        //std::cout << tempstr << " ";
         try {
             out << dict.at(tempstr);
 
@@ -290,19 +320,26 @@ void decode() {
 
     }
 
-    out.close();
+    try {
+        out << dict.at(tempstr);
 
+        tempstr = "";
+    }
+    catch (const std::out_of_range& oor) {
+        
+    }
+
+    out.close();
+    std::cout << "decoding done in  " << (clock() - start) / (double)CLOCKS_PER_SEC << std::endl;
 
 }
 
 int main() {
+    //std::cout << dec_to_bin(1) << std::endl;
+    //bool bits[8] = { true, false, true,true, true, true, true ,true};
+    //std::cout << pack_byte(bits) << " ";
     encode();
 
     std::cout << "coding done" << std::endl;
     decode();
-    int n;
-    std::cin >> n;
-
 }
-
-
