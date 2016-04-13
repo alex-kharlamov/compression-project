@@ -147,7 +147,7 @@ void encode() {
 
         std::sort(chardict.begin(), chardict.end());
 
-        for (int i = 0; i < chardict.size(); ++i) { //инициализация вершин
+        for (int i = 0; i < chardict.size(); ++i) { //vertex init
             ver* temp = new ver;
             temp->myself = temp;
             temp->counter = chardict[i].first;
@@ -161,7 +161,7 @@ void encode() {
         unsigned long init = clock() - start_time;
         std::cout << "init " << init / (double)CLOCKS_PER_SEC << std::endl;
 
-        while (qu.size() > 1) { //постройка дерева
+        while (qu.size() > 1) { //build tree
             const ver* left;
             const ver* right;
             left = qu.top().myself;
@@ -180,7 +180,7 @@ void encode() {
         unsigned long tree = clock();
         std::cout << "build tree " << (tree - init) / (double)CLOCKS_PER_SEC << std::endl;
 
-        build_dict(qu.top(), "", dictionary); //создание словаря
+        build_dict(qu.top(), "", dictionary); //making dict
 
         unsigned long dic = clock();
         std::cout << "build dict " << (dic - tree) / (double)CLOCKS_PER_SEC << std::endl;
@@ -251,6 +251,13 @@ void encode() {
 
 }
 
+struct decode_huf_ver{
+    //decode_huf_ver *temp = new decode_huf_ver;
+    char letter = NULL;
+    decode_huf_ver *leftson = NULL, *rightson = NULL;
+    decode_huf_ver* myself;
+};
+
 
 
 void decode() {
@@ -260,7 +267,8 @@ void decode() {
     std::getline(dicin, n);
     //std::cout << std::stoi(n) << std::endl;
     std::map<std::string, char> dict;
-
+    decode_huf_ver root;
+    root.myself = &root;
     for (int i = 0; i < std::stoi(n); ++i) {
         std::string str;
         char let;
@@ -269,6 +277,77 @@ void decode() {
         let = str[0];
         str.erase(0, 2);
         dict[str] = let;
+        decode_huf_ver *temp = new decode_huf_ver;
+        temp = &root;
+        for (int j = 0; j < str.length(); ++j) {
+            if (str[j] == '1') {
+                
+                if (temp->rightson != NULL) {
+                    temp = temp->rightson;
+                    if (j == str.length() - 1) {
+                        temp->letter = let;
+                        break;
+                    }
+                } else {
+                    decode_huf_ver *temp_temp = new decode_huf_ver;
+
+                    temp->rightson = temp_temp;
+                    temp = temp->rightson;
+                    if (j == str.length() - 1) {
+                        temp->letter = let;
+                        break;
+                    }
+#if 0
+   temp_temp->rightson = temp->rightson->rightson;
+                    temp_temp->leftson = temp->rightson->leftson;
+                    temp_temp->myself = temp->rightson->myself;
+                    temp_temp->letter = temp->rightson->letter;
+
+
+                    temp->rightson = temp_temp->rightson;
+                    temp->leftson = temp_temp->leftson;
+                    temp->letter = temp_temp->letter;
+                    temp->myself = temp_temp->myself;
+#endif
+
+                }
+            } 
+            if (str[j] == '0') {
+                
+                
+                if (temp->leftson != NULL) {
+                    temp = temp->leftson;
+                    if (j == str.length() - 1) {
+                        temp->letter = let;
+                        break;
+                    }
+                } else {
+                    decode_huf_ver *temp_temp = new decode_huf_ver;
+                    temp->leftson = temp_temp;
+                    temp = temp->leftson;
+                    if (j == str.length() - 1) {
+                        temp->letter = let;
+                        break;
+                    }
+
+#if 0
+  temp_temp->rightson = temp->leftson->rightson;
+                    temp_temp->leftson = temp->leftson->leftson;
+                    temp_temp->myself = temp->leftson->myself;
+                    temp_temp->letter = temp->leftson->letter;
+
+
+                    temp->rightson = temp_temp->rightson;
+                    temp->leftson = temp_temp->leftson;
+                    temp->letter = temp_temp->letter;
+                    temp->myself = temp_temp->myself;
+#endif
+
+                }
+
+            }
+        }
+
         //std::cout << let << " " << str << " " <<  str.length() <<  std::endl;
     }
     
@@ -309,7 +388,36 @@ void decode() {
     for (int i = 0; i < mem.length(); ++i) {
         tempstr += mem[i];
         //std::cout << tempstr << " ";
-        try {
+
+        decode_huf_ver *temp = new decode_huf_ver;
+        temp = &root;
+        int j = 0;
+        while ( j <= tempstr.length() ) {
+            if (temp -> letter != NULL) {
+                out << temp -> letter;
+                tempstr = "";
+                break;
+            } else {
+                if (tempstr[j] == '1' ) {
+                    if (temp->rightson != NULL) {
+                        temp = temp->rightson;
+                        j += 1;
+                    } else {
+                        break;
+                    }
+                } else {
+                    if (temp->leftson != NULL) {
+                        temp = temp->leftson;
+                        j += 1;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+#if 0
+  try {
             out << dict.at(tempstr);
 
             tempstr = "";
@@ -317,17 +425,11 @@ void decode() {
         catch (const std::out_of_range& oor) {
             continue;
         }
+#endif
+
 
     }
 
-    try {
-        out << dict.at(tempstr);
-
-        tempstr = "";
-    }
-    catch (const std::out_of_range& oor) {
-        
-    }
 
     out.close();
     std::cout << "decoding done in  " << (clock() - start) / (double)CLOCKS_PER_SEC << std::endl;
@@ -342,4 +444,6 @@ int main() {
 
     std::cout << "coding done" << std::endl;
     decode();
+
+
 }
