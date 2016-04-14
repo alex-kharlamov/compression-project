@@ -40,10 +40,10 @@ void build_dict(ver const &v, std::string str, std::vector<std::string> &diction
     if (v.letter != '\0') {
         dictionary[int(v.letter) + 128] = str;
     }
-    if (v.leftson != NULL) {
+    if (v.leftson != nullptr) {
         build_dict(*v.leftson, str + "0", dictionary);
     }
-    if (v.rightson != NULL) {
+    if (v.rightson != nullptr) {
         build_dict(*v.rightson, str + "1", dictionary);
     }
 
@@ -115,7 +115,7 @@ void encode() {
     std::vector<std::string> dictionary(258, "");
     unsigned long start_time = clock();
 
-    std::ifstream file("test.txt");
+    std::ifstream file("data2");
 
 
     if (file) {
@@ -154,8 +154,8 @@ void encode() {
             temp->myself = temp;
             temp->counter = chardict[i].first;
             temp->letter = chardict[i].second;
-            temp->leftson = NULL;
-            temp->rightson = NULL;
+            temp->leftson = nullptr;
+            temp->rightson = nullptr;
             qu.push(*temp);
 
         }
@@ -255,8 +255,8 @@ void encode() {
 
 struct decode_huf_ver{
     //decode_huf_ver *temp = new decode_huf_ver;
-    char letter = NULL;
-    decode_huf_ver *leftson = NULL, *rightson = NULL;
+    char letter = char(-1);
+    decode_huf_ver *leftson, *rightson;
     decode_huf_ver* myself;
 };
 
@@ -270,6 +270,8 @@ void decode() {
     //std::cout << std::stoi(n) << std::endl;
     std::map<std::string, char> dict;
     decode_huf_ver root;
+    root.leftson = &root;
+    root.rightson = &root;
     root.myself = &root;
     for (int i = 0; i < std::stoi(n); ++i) {
         std::string str;
@@ -281,11 +283,13 @@ void decode() {
         //str.erase(0, 2);
         dict[str] = let;
         decode_huf_ver *temp = new decode_huf_ver;
+
+        decode_huf_ver *null_huf_ver = new decode_huf_ver;
         temp = &root;
         for (unsigned long long j = 0; j < str.length(); ++j) {
             if (str[j] == '1') {
                 
-                if (temp->rightson != NULL) {
+                if (temp->rightson != &root) {
                     temp = temp->rightson;
                     if (j == str.length() - 1) {
                         temp->letter = let;
@@ -293,7 +297,8 @@ void decode() {
                     }
                 } else {
                     decode_huf_ver *temp_temp = new decode_huf_ver;
-
+                    temp_temp->leftson = &root;
+                    temp_temp->rightson = &root;
                     temp->rightson = temp_temp;
                     temp = temp->rightson;
                     if (j == str.length() - 1) {
@@ -318,7 +323,7 @@ void decode() {
             if (str[j] == '0') {
                 
                 
-                if (temp->leftson != NULL) {
+                if (temp->leftson != &root) {
                     temp = temp->leftson;
                     if (j == str.length() - 1) {
                         temp->letter = let;
@@ -326,6 +331,8 @@ void decode() {
                     }
                 } else {
                     decode_huf_ver *temp_temp = new decode_huf_ver;
+                    temp_temp->leftson = &root;
+                    temp_temp->rightson = &root;
                     temp->leftson = temp_temp;
                     temp = temp->leftson;
                     if (j == str.length() - 1) {
@@ -398,19 +405,19 @@ void decode() {
         mem += dec_to_str_vec[int(buffer[i])];
 
         while (j < mem.length()) {
-            if (temp->letter != NULL) {
+            if (temp->letter != char(-1)) {
                 buff += temp->letter;
                 temp = &root;
                 j -= 1;
                 
             } else {
                 if (mem[j] == '1') {
-                    if (temp->rightson != NULL) {
+                    if (temp->rightson != &root) {
                         temp = temp->rightson;
                         
                     } 
                 } else {
-                    if (temp->leftson != NULL) {
+                    if (temp->leftson != &root) {
                         temp = temp->leftson;
                         
                     } 
@@ -425,19 +432,19 @@ void decode() {
         mem += buffer[i];
 
         while (j < mem.length()) {
-            if (temp->letter != NULL) {
+            if (temp->letter != char(-1)) {
                 buff += temp->letter;
                 temp = &root;
                 j -= 1;
 
             } else {
                 if (mem[j] == '1') {
-                    if (temp->rightson != NULL) {
+                    if (temp->rightson != &root) {
                         temp = temp->rightson;
 
                     }
                 } else {
-                    if (temp->leftson != NULL) {
+                    if (temp->leftson != &root) {
                         temp = temp->leftson;
 
                     }
@@ -461,20 +468,20 @@ void decode() {
         temp = &root;
         int j = 0;
         while ( j <= tempstr.length() ) {
-            if (temp -> letter != NULL) {
+            if (temp -> letter != nullptr) {
                 out << temp -> letter;
                 tempstr = "";
                 break;
             } else {
                 if (tempstr[j] == '1' ) {
-                    if (temp->rightson != NULL) {
+                    if (temp->rightson != nullptr) {
                         temp = temp->rightson;
                         j += 1;
                     } else {
                         break;
                     }
                 } else {
-                    if (temp->leftson != NULL) {
+                    if (temp->leftson != nullptr) {
                         temp = temp->leftson;
                         j += 1;
                     } else {
