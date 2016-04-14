@@ -22,8 +22,6 @@
 #endif
 
 
-
-
 //std::vector<std::string> dictionary(258, "");
 
 struct ver {
@@ -85,9 +83,9 @@ char pack_byte(bool bits[7]) {
     }
     return result;
 #endif
-    short pow[7] = { 64, 32, 16, 8, 4, 2, 1 };
-    int res = 0;
-    for (int i = 0; i < 7; ++i) {
+    short pow[8] = {128, 64, 32, 16, 8, 4, 2, 1 };
+    auto res = 0;
+    for (int i = 0; i < 8; ++i) {
         res += int(bits[i]) * pow[i];
     }
     return res;
@@ -115,7 +113,7 @@ void encode() {
     std::vector<std::string> dictionary(258, "");
     unsigned long start_time = clock();
 
-    std::ifstream file("data2");
+    std::ifstream file("test.txt");
 
 
     if (file) {
@@ -135,7 +133,7 @@ void encode() {
         std::vector<int> dict(256, 0);
 
         for (unsigned long long i = 0; i < length; ++i) {
-            dict[int(buffer[i]) + 128] += 1;
+            dict[int(static_cast<unsigned char> (buffer[i]))] += 1;
         }
 
         std::priority_queue<ver, std::vector<ver>, ver> qu;
@@ -143,7 +141,7 @@ void encode() {
         std::vector<std::pair<int, char>> chardict;
         for (int i = 0; i < 256; ++i) {
             if (dict[i] > 0) {
-                chardict.push_back(std::make_pair(dict[i], char(i - 128)));
+                chardict.push_back(std::make_pair(dict[i], char(i)));
             }
         }
 
@@ -214,7 +212,7 @@ void encode() {
 
         int j = -1;
         std::string buff = "";
-        bool bits[7];
+        bool bits[8];
 
         for (unsigned long long i = 0; i < length; ++i) {
             //codeout << dictionary[int(buffer[i]) + 128];
@@ -226,7 +224,7 @@ void encode() {
                 bits[j] = bool(elem - '0');
 
 
-                if (j == 6) {
+                if (j == 7) {
                     buff += pack_byte(bits);
                     j = -1;
                 }
@@ -255,9 +253,10 @@ void encode() {
 
 struct decode_huf_ver{
     //decode_huf_ver *temp = new decode_huf_ver;
-    char letter = char(-1);
+    char letter;
     decode_huf_ver *leftson, *rightson;
     decode_huf_ver* myself;
+    bool used = false;
 };
 
 
@@ -293,6 +292,7 @@ void decode() {
                     temp = temp->rightson;
                     if (j == str.length() - 1) {
                         temp->letter = let;
+                        temp->used = true;
                         break;
                     }
                 } else {
@@ -303,6 +303,7 @@ void decode() {
                     temp = temp->rightson;
                     if (j == str.length() - 1) {
                         temp->letter = let;
+                        temp->used = true;
                         break;
                     }
 #if 0
@@ -327,6 +328,7 @@ void decode() {
                     temp = temp->leftson;
                     if (j == str.length() - 1) {
                         temp->letter = let;
+                        temp->used = true;
                         break;
                     }
                 } else {
@@ -337,6 +339,7 @@ void decode() {
                     temp = temp->leftson;
                     if (j == str.length() - 1) {
                         temp->letter = let;
+                        temp->used = true;
                         break;
                     }
 
@@ -391,9 +394,9 @@ void decode() {
     std::vector<std::string> dec_to_str_vec;
 
     for (int i = 0; i < 256; ++i) {
-        std::bitset<7> bits = i;
+        std::bitset<8> bits = i;
 
-        dec_to_str_vec.push_back( bits.to_string<char, std::char_traits<char>, std::allocator<char> >());
+        dec_to_str_vec.push_back( bits.to_string());
     }
 
     for (unsigned long long i = 0; i < length - buffer[length - 1] + '0' - 1; ++i ) {
@@ -402,61 +405,45 @@ void decode() {
         //std::bitset<7> bits = int(buffer[i]);
 
         //mem += bits.to_string<char, std::char_traits<char>, std::allocator<char> >();
-        mem += dec_to_str_vec[int(buffer[i])];
-
-        while (j < mem.length()) {
-            if (temp->letter != char(-1)) {
-                buff += temp->letter;
-                temp = &root;
-                j -= 1;
-                
-            } else {
-                if (mem[j] == '1') {
-                    if (temp->rightson != &root) {
-                        temp = temp->rightson;
-                        
-                    } 
-                } else {
-                    if (temp->leftson != &root) {
-                        temp = temp->leftson;
-                        
-                    } 
-                }
-            }
-            j += 1;
-        }
+        mem += dec_to_str_vec[(static_cast<unsigned char> (buffer[i]))];
+        
 
 
     }
-    for (unsigned long long i = length - buffer[length - 1] - 1 + '0'; i < length - 1; ++i) {
+    
+    for (unsigned long long i = length - buffer[length - 1] + '0' - 1; i < length; ++i) {
         mem += buffer[i];
 
-        while (j < mem.length()) {
-            if (temp->letter != char(-1)) {
-                buff += temp->letter;
-                temp = &root;
-                j -= 1;
+        
+    }
+    unsigned long memorised = clock();
+    std::cout << "outmemorised " << (memorised - dict_coded) / (double)CLOCKS_PER_SEC << std::endl;
+    while (j < mem.length()) {
+        if (temp->used == true) {
+            buff += temp->letter;
+            temp = &root;
+            j -= 1;
 
+        } else {
+            if (mem[j] == '1') {
+                if (temp->rightson != &root) {
+                    temp = temp->rightson;
+
+                }
             } else {
-                if (mem[j] == '1') {
-                    if (temp->rightson != &root) {
-                        temp = temp->rightson;
+                if (temp->leftson != &root) {
+                    temp = temp->leftson;
 
-                    }
-                } else {
-                    if (temp->leftson != &root) {
-                        temp = temp->leftson;
-
-                    }
                 }
             }
-            j += 1;
         }
+        j += 1;
     }
-    //std::cout << mem << std::endl;
+
+    std::cout << std::endl << std::endl;
 
     unsigned long outbuff = clock();
-    std::cout << "outbufing " << (outbuff - dict_coded) / (double)CLOCKS_PER_SEC << std::endl;
+    std::cout << "outbufing " << (outbuff - memorised) / (double)CLOCKS_PER_SEC << std::endl;
     
 
 #if 0
@@ -517,11 +504,19 @@ int main() {
     //std::cout << dec_to_bin(1) << std::endl;
     //bool bits[8] = { true, false, true,true, true, true, true ,true};
     //std::cout << pack_byte(bits) << " ";
+	/*
+	for(int i = -127; i < 128; ++i) {
+		if (((126 < i) && (i <= 160)) || ((-127 <= i) && (i <= 32))) {
+			std::cout << "case char(" <<  i << ") : ret = " << int(static_cast<unsigned char> (char(i))) << ";" << '\n';
+		}
+		else {
+			
+			std::cout << "case " << "'" << char(i) << "' : ret = " << int(static_cast<unsigned char> (char(i))) << ';' <<  '\n';
+		}
+	}
+    */
 
-    std::bitset<7> bits = 15;
-
-    std::cout <<  bits.to_string<char, std::char_traits<char>, std::allocator<char> >() << std::endl;
-    std::cout << dec_to_bin(15);
+    std::cout << char(-126) << std::endl;
     encode();
 
     std::cout << "coding done" << std::endl;
