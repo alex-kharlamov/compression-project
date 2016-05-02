@@ -110,6 +110,7 @@ void load_file(std::string& s, std::istream& is) {
 }
 
 void encode() {
+    unsigned long long buff_out_size = 11000000;
     std::vector<std::string> dictionary(258, "");
     unsigned long start_time = clock();
     
@@ -117,12 +118,12 @@ void encode() {
     
     
     if (file) {
-        /*
+        
         // get length of file:
         file.seekg(0, file.end);
-        unsigned long long length = file.tellg();
+        unsigned long long file_length = file.tellg();
         file.seekg(0, file.beg);
-        
+        /*
         char * buffer = new char[length];
         
         // read data as a block:
@@ -130,8 +131,10 @@ void encode() {
          
         */
         std::string buffer;
+        buffer.reserve(file_length);
         
         std::string s;
+        
         while (!file.eof())
         {
             std::getline(file, s);
@@ -224,7 +227,7 @@ void encode() {
         
         int j = -1;
         std::string buff = "";
-        buff.reserve(length * 8);
+        buff.reserve(length);
         bool bits[8];
         
         for (unsigned long long i = 0; i < length; ++i) {
@@ -239,6 +242,10 @@ void encode() {
                 
                 if (j == 7) {
                     buff += pack_byte(bits);
+                    if (buff.length() > buff_out_size) {
+                        codeout << buff;
+                        buff = "";
+                    }
                     j = -1;
                 }
                 
@@ -265,7 +272,6 @@ void encode() {
 }
 
 struct decode_huf_ver {
-    //decode_huf_ver *temp = new decode_huf_ver;
     char letter;
     decode_huf_ver *leftson, *rightson;
     decode_huf_ver* myself;
@@ -275,6 +281,7 @@ struct decode_huf_ver {
 
 
 void decode() {
+    unsigned long long buff_out_size = 11000000;
     unsigned long start = clock();
     std::ifstream dicin("dict.txt");
     std::string n;
@@ -295,8 +302,6 @@ void decode() {
         //str.erase(0, 2);
         dict[str] = let;
         decode_huf_ver *temp = new decode_huf_ver;
-        
-        decode_huf_ver *null_huf_ver = new decode_huf_ver;
         temp = &root;
         for (unsigned long long j = 0; j < str.length(); ++j) {
             if (str[j] == '1') {
@@ -319,18 +324,6 @@ void decode() {
                         temp->used = true;
                         break;
                     }
-#if 0
-                    temp_temp->rightson = temp->rightson->rightson;
-                    temp_temp->leftson = temp->rightson->leftson;
-                    temp_temp->myself = temp->rightson->myself;
-                    temp_temp->letter = temp->rightson->letter;
-                    
-                    
-                    temp->rightson = temp_temp->rightson;
-                    temp->leftson = temp_temp->leftson;
-                    temp->letter = temp_temp->letter;
-                    temp->myself = temp_temp->myself;
-#endif
                     
                 }
             }
@@ -356,18 +349,6 @@ void decode() {
                         break;
                     }
                     
-#if 0
-                    temp_temp->rightson = temp->leftson->rightson;
-                    temp_temp->leftson = temp->leftson->leftson;
-                    temp_temp->myself = temp->leftson->myself;
-                    temp_temp->letter = temp->leftson->letter;
-                    
-                    
-                    temp->rightson = temp_temp->rightson;
-                    temp->leftson = temp_temp->leftson;
-                    temp->letter = temp_temp->letter;
-                    temp->myself = temp_temp->myself;
-#endif
                     
                 }
                 
@@ -397,9 +378,9 @@ void decode() {
     
     std::ofstream out("output");
     std::string mem = "";
-    mem.reserve(length * 8);
+    mem.reserve(length);
     std::string buff = "";
-    buff.reserve(length * 8);
+    buff.reserve(length);
     //std::cout << buffer[length - 1] << std::endl;
     
     decode_huf_ver *temp = new decode_huf_ver;
@@ -422,8 +403,41 @@ void decode() {
         //mem += bits.to_string<char, std::char_traits<char>, std::allocator<char> >();
         mem += dec_to_str_vec[(256 + buffer[i]) % 256];
         
+        if (mem.length() > buff_out_size * 10) {
+            while (j < mem.length()) {
+                if (mem[j] == '1') {
+                    temp = temp->rightson;
+                    
+                    if (temp->used == true) {
+                        buff += temp->letter;
+                        if (buff.length() > buff_out_size ) {
+                            out << buff;
+                            buff = "";
+                        }
+                        temp = &root;
+                        
+                    }
+                } else {
+                    temp = temp->leftson;
+                    
+                    if (temp->used == true) {
+                        buff += temp->letter;
+                        if (buff.length() > buff_out_size ) {
+                            out << buff;
+                            buff = "";
+                        }
+                        temp = &root;
+                        
+                    }
+                }
+                
+                j += 1;
+            }
         
+        j = 0;
+        mem = "";
         
+        }
     }
     
     for (unsigned long long i = length - buffer[length - 1] + '0' - 1; i < length; ++i) {
@@ -433,80 +447,44 @@ void decode() {
     }
     unsigned long memorised = clock();
     std::cout << "outmemorised " << (memorised - dict_coded) / (double)CLOCKS_PER_SEC << std::endl;
+
     while (j < mem.length()) {
-        if (temp->used == true) {
-            buff += temp->letter;
-            temp = &root;
-            j -= 1;
-            
-        } else {
             if (mem[j] == '1') {
-                if (temp->rightson != &root) {
                     temp = temp->rightson;
+                
+                    if (temp->used == true) {
+                        buff += temp->letter;
+                        if (buff.length() > buff_out_size ) {
+                            out << buff;
+                            buff = "";
+                        }
+                        temp = &root;
                     
                 }
             } else {
-                if (temp->leftson != &root) {
                     temp = temp->leftson;
+                
+                    if (temp->used == true) {
+                        buff += temp->letter;
+                        if (buff.length() > buff_out_size ) {
+                            out << buff;
+                            buff = "";
+                        }
+                        temp = &root;
                     
                 }
             }
-        }
+        
         j += 1;
     }
+
+    
     
     std::cout << std::endl << std::endl;
     
     unsigned long outbuff = clock();
     std::cout << "outbufing " << (outbuff - memorised) / (double)CLOCKS_PER_SEC << std::endl;
     
-    
-#if 0
-    for (int i = 0; i < mem.length(); ++i) {
-        tempstr += mem[i];
-        //std::cout << tempstr << " ";
-        
-        decode_huf_ver *temp = new decode_huf_ver;
-        temp = &root;
-        int j = 0;
-        while (j <= tempstr.length()) {
-            if (temp->letter != nullptr) {
-                out << temp->letter;
-                tempstr = "";
-                break;
-            } else {
-                if (tempstr[j] == '1') {
-                    if (temp->rightson != nullptr) {
-                        temp = temp->rightson;
-                        j += 1;
-                    } else {
-                        break;
-                    }
-                } else {
-                    if (temp->leftson != nullptr) {
-                        temp = temp->leftson;
-                        j += 1;
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
-        
-#if 0
-        try {
-            out << dict.at(tempstr);
-            
-            tempstr = "";
-        }
-        catch (const std::out_of_range& oor) {
-            continue;
-        }
-#endif
-        
-        
-    }
-#endif
     
     out << buff;
     
@@ -516,22 +494,6 @@ void decode() {
 }
 
 int main() {
-    //std::cout << dec_to_bin(1) << std::endl;
-    //bool bits[8] = { true, false, true,true, true, true, true ,true};
-    //std::cout << pack_byte(bits) << " ";
-    /*
-     for(int i = -127; i < 128; ++i) {
-     if (((126 < i) && (i <= 160)) || ((-127 <= i) && (i <= 32))) {
-     std::cout << "case char(" <<  i << ") : ret = " << int(static_cast<unsigned char> (char(i))) << ";" << '\n';
-     }
-     else {
-     
-     std::cout << "case " << "'" << char(i) << "' : ret = " << int(static_cast<unsigned char> (char(i))) << ';' <<  '\n';
-     }
-     }
-     */
-    
-    std::cout << char(-126) << std::endl;
     encode();
     
     std::cout << "coding done" << std::endl;
