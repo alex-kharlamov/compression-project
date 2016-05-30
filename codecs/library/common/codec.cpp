@@ -109,12 +109,12 @@ void load_file(std::string& s, std::istream& is) {
     }
 }
 
-void encode() {
+void encode(std::string &inp_file) {
     unsigned long long buff_out_size = 11000000;
     std::vector<std::string> dictionary(258, "");
     unsigned long start_time = clock();
     
-    std::ifstream file("data2");
+    std::ifstream file(inp_file);
     
     
     if (file) {
@@ -161,6 +161,7 @@ void encode() {
         }
         
         std::sort(chardict.begin(), chardict.end());
+        std::vector<ver*> destroy;
         
         for (int i = 0; i < chardict.size(); ++i) { //vertex init
             ver* temp = new ver;
@@ -171,6 +172,7 @@ void encode() {
             temp->rightson = nullptr;
             temp->letterused = true;
             qu.push(*temp);
+            destroy.push_back(temp);
             
         }
         
@@ -190,6 +192,7 @@ void encode() {
             newver->rightson = right;
             newver->counter = left->counter + right->counter;
             qu.push(*newver);
+            destroy.push_back(newver);
         }
         
         unsigned long tree = clock();
@@ -266,9 +269,12 @@ void encode() {
         codeout.close();
         std::cout << "writing " << (clock() - builddict) / (double)CLOCKS_PER_SEC << std::endl;
         std::cout << "coding " << (clock() - start_time) / (double)CLOCKS_PER_SEC << std::endl;
-    }
     
-    
+
+	    for (auto elem : destroy){
+	    	delete elem;
+	    }
+	}
 }
 
 struct decode_huf_ver {
@@ -281,6 +287,7 @@ struct decode_huf_ver {
 
 
 void decode() {
+	std::vector<decode_huf_ver*> destroy;
     unsigned long long buff_out_size = 11000000;
     unsigned long start = clock();
     std::ifstream dicin("dict.txt");
@@ -302,6 +309,7 @@ void decode() {
         //str.erase(0, 2);
         dict[str] = let;
         decode_huf_ver *temp = new decode_huf_ver;
+        destroy.push_back(temp);
         temp = &root;
         for (unsigned long long j = 0; j < str.length(); ++j) {
             if (str[j] == '1') {
@@ -315,6 +323,7 @@ void decode() {
                     }
                 } else {
                     decode_huf_ver *temp_temp = new decode_huf_ver;
+                    destroy.push_back(temp_temp);
                     temp_temp->leftson = &root;
                     temp_temp->rightson = &root;
                     temp->rightson = temp_temp;
@@ -339,6 +348,7 @@ void decode() {
                     }
                 } else {
                     decode_huf_ver *temp_temp = new decode_huf_ver;
+                    destroy.push_back(temp_temp);
                     temp_temp->leftson = &root;
                     temp_temp->rightson = &root;
                     temp->leftson = temp_temp;
@@ -349,11 +359,11 @@ void decode() {
                         break;
                     }
                     
-                    
                 }
                 
             }
         }
+
         
         //std::cout << let << " " << str << " " <<  str.length() <<  std::endl;
     }
@@ -384,6 +394,7 @@ void decode() {
     //std::cout << buffer[length - 1] << std::endl;
     
     decode_huf_ver *temp = new decode_huf_ver;
+    destroy.push_back(temp);
     temp = &root;
     unsigned long long j = 0;
     
@@ -477,10 +488,6 @@ void decode() {
         
         j += 1;
     }
-
-    
-    
-    std::cout << std::endl << std::endl;
     
     unsigned long outbuff = clock();
     std::cout << "outbufing " << (outbuff - memorised) / (double)CLOCKS_PER_SEC << std::endl;
@@ -490,13 +497,32 @@ void decode() {
     
     out.close();
     std::cout << "decoding done in  " << (clock() - start) / (double)CLOCKS_PER_SEC << std::endl;
-    
+    for (auto elem : destroy){
+    	delete elem;
+    }
 }
 
-int main() {
-    encode();
-    
-    std::cout << "coding done" << std::endl;
-    decode();
-    
+int main(int argc, char* argv[]) {
+	if (argc == 1) {
+		std::cout << "Please add file name" << std::endl;
+	}
+	if (argc == 2) {
+		std::string second_arg;
+		second_arg = (const char*) argv[1];
+		if (second_arg == "--help") {
+			std::cout << "First parameter is name of the file to encode" << std::endl;
+			std::cout << "Second parameter is type of input file:" << std::endl;
+			std::cout << "-lines for \\n files" << std::endl;
+			std::cout << "-uint for LE uint32_t files" << std::endl;
+			std::cout << "If you will add only name of the file, by default will be used -lines" << std::endl;
+		} else {
+			encode(second_arg);
+			std::cout << "coding done" << std::endl;
+	    	decode();
+    	}
+
+
+	} else {
+		//TODO
+    }
 }
